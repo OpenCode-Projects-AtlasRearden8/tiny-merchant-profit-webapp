@@ -1,0 +1,10 @@
+{
+  "name": "tiny-merchant-profit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline one-page shift ledger for craft-fair and market vendors: running profit, hourly pace bars, vendor-math CSV export.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node tests/run-tests.js && node tests/smoke-dom.js"
+  }
+}

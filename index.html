@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiny Merchant Profit — shift ledger for craft-fair vendors</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
+<style>
+  :root {
+    --bg: #faf6ee;
+    --card: #fffdf8;
+    --ink: #2b241c;
+    --muted: #7a6f61;
+    --line: #e6ddcd;
+    --brown: #8b5e34;
+    --brown-dark: #6f4a27;
+    --green: #2e7d32;
+    --green-soft: #e7f1e4;
+    --red: #b3402a;
+    --red-soft: #f8e8e2;
+    --gold: #d9a441;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 16px; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.45;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 1rem 1rem 4rem; }
+  h1 { font-size: 1.35rem; margin: 0; }
+  h2 { font-size: 1rem; margin: 0 0 .6rem; color: var(--brown-dark); text-transform: uppercase; letter-spacing: .06em; }
+  .tagline { color: var(--muted); font-size: .85rem; margin: .15rem 0 1rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 3px rgba(90, 60, 20, .06);
+  }
+  . toplabel { display: block; }
+  label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: .15rem; }
+  input, select {
+    font: inherit;
+    padding: .5rem .55rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ink);
+    width: 100%;
+  }
+  input:focus, select:focus { outline: 2px solid var(--gold); outline-offset: 1px; border-color: var(--gold); }
+  .row { display: flex; gap: .6rem; flex-wrap: wrap; }
+  .row > * { flex: 1 1 0; min-width: 90px; }
+  .row > .narrow { flex: 0 0 auto; }
+  button {
+    font: inherit;
+    padding: .55rem .9rem;
+    border-radius: 8px;
+    border: 1px solid var(--brown);
+    background: var(--brown);
+    color: #fff;
+    cursor: pointer;
+  }
+  button:hover { background: var(--brown-dark); }
+  button.ghost { background: transparent; color: var(--brown); }
+  button.ghost:hover { background: #f3ead9; }
+  button.danger { background: transparent; border-color: var(--red); color: var(--red); }
+  button.danger:hover { background: var(--red-soft); }
+  .type-toggle { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; width: fit-content; }
+  .type-toggle button { border: none; border-radius: 0; background: #fff; color: var(--muted); padding: .45rem .9rem; }
+  .type-toggle button[aria-pressed="true"] { background: var(--green); color: #fff; }
+  .type-toggle button[aria-pressed="true"].refund-on { background: var(--red); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: .6rem; }
+  .stat {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: .55rem .65rem;
+  }
+  .stat .k { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .stat .v { font-size: 1.05rem; font-weight: 700; margin-top: .1rem; white-space: nowrap; }
+  .stat.net { background: var(--green-soft); border-color: #bcd8b6; }
+  .stat.net.neg { background: var(--red-soft); border-color: #e5b7a8; }
+  .profit-line {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+  }
+  .profit-sub { color: var(--muted); font-size: .8rem; }
+  table.ledger { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  table.ledger th, table.ledger td { text-align: left; padding: .4rem .45rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.ledger th { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  table.ledger td.num, table.ledger th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.ledger tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; font-size: .68rem; font-weight: 700; padding: .1rem .45rem; border-radius: 999px; }
+  .badge.cash { background: #e8efe6; color: #3c6e2f; }
+  .badge.card { background: #e7ecf3; color: #35537a; }
+  .badge.refund { background: var(--red-soft); color: var(--red); }
+  .del { padding: 0 .3rem; border: none; background: none; color: var(--muted); font-size: 1rem; cursor: pointer; }
+  .del:hover { color: var(--red); background: none; }
+  .empty { color: var(--muted); font-style: italic; padding: .6rem 0; }
+  .pace { display: flex; align-items: flex-end; gap: .35rem; height: 130px; padding: .3rem 0 0; }
+  .pace .slot { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 0; }
+  .pace .bar { width: 100%; max-width: 46px; background: var(--green); border-radius: 4px 4px 0 0; min-height: 2px; }
+  .pace .bar.zero { background: #ded4c2; height: 2px; }
+  .pace .lbl { font-size: .65rem; color: var(--muted); margin-top: .3rem; white-space: nowrap; }
+  .pace-legend { color: var(--muted); font-size: .75rem; margin-top: .5rem; }
+  .actions { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .5rem; }
+  .form-note { color: var(--red); font-size: .8rem; margin-top: .4rem; min-height: 1em; }
+  footer { color: var(--muted); font-size: .78rem; text-align: center; padding: .5rem 1rem 2.5rem; }
+  footer a { color: var(--brown); }
+  @media (max-width: 540px) {
+    .row > * { min-width: calc(50% - .3rem); }
+    .pace .lbl { font-size: .55rem; }
+  }
+</style>
+</head>
+<body>
+<noscript><p style="padding:1rem">This app needs JavaScript — everything runs locally in your browser, nothing is sent anywhere.</p></noscript>
+<main>
+  <header style="display:flex; justify-content:space-between; align-items:flex-start; gap:.5rem; flex-wrap:wrap">
+    <div>
+      <h1>🧾 Tiny Merchant Profit</h1>
+      <p class="tagline">One-page point-of-day ledger for market &amp; craft-fair shifts. 100% offline — data stays in this browser.</p>
+    </div>
+    <div style="min-width:150px">
+      <label for="day">Shift day</label>
+      <input type="date" id="day">
+    </div>
+  </header>
+
+  <section class="card">
+    <div class="row">
+      <div>
+        <label for="vendor">Vendor / stall name</label>
+        <input id="vendor" type="text" placeholder="e.g. Birch &amp; Twine Co." maxlength="60">
+      </div>
+      <div class="narrow" style="max-width:90px">
+        <label for="symbol">Symbol</label>
+        <input id="symbol" type="text" value="$" maxlength="3">
+      </div>
+      <div class="narrow" style="max-width:110px">
+        <label for="startHour">Opens</label>
+        <select id="startHour"></select>
+      </div>
+      <div class="narrow" style="max-width:110px">
+        <label for="endHour">Closes</label>
+        <select id="endHour"></select>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="pnlCard">
+    <h2>Running shift P&amp;L</h2>
+    <div class="profit-line" id="netProfit">$0.00</div>
+    <div class="profit-sub" id="netDetail">Add your first sale to start the line.</div>
+    <div class="stats" style="margin-top:.8rem">
+      <div class="stat"><div class="k">Gross sales</div><div class="v" id="gross">—</div></div>
+      <div class="stat"><div class="k">Cash</div><div class="v" id="cash">—</div></div>
+      <div class="stat"><div class="k">Card</div><div class="v" id="card">—</div></div>
+      <div class="stat"><div class="k">Refunds</div><div class="v" id="refunds">—</div></div>
+      <div class="stat"><div class="k">Cost of goods</div><div class="v" id="cogs">—</div></div>
+      <div class="stat net" id="netStat"><div class="k">Net profit</div><div class="v" id="netProfitSmall">—</div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Hourly pace</h2>
+    <div class="pace" id="pace" aria-label="Sales per hour as bars"></div>
+    <div class="pace-legend" id="paceLegend">Bar height = net sales (sales minus refunds) taken in that hour. Hover a bar for the breakdown.</div>
+  </section>
+
+  <section class="card">
+    <h2 id="formTitle">Add a sale</h2>
+    <form id="entryForm">
+      <div class="row">
+        <div><label for="desc">Item / note</label><input id="desc" type="text" maxlength="80" placeholder="e.g. Walnut cutting board"></div>
+        <div class="narrow" style="max-width:120px"><label for="amount">Amount</label><input id="amount" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0.00" required></div>
+        <div class="narrow" style="max-width:120px"><label for="cogs">Cost of goods</label><input id="cogs" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0.00"></div>
+      </div>
+      <div class="row" style="margin-top:.6rem; align-items:flex-end">
+        <div>
+          <label>Payment taken</label>
+          <div class="type-toggle">
+            <button type="button" id="btnCash" aria-pressed="true">Cash</button>
+            <button type="button" id="btnCard" aria-pressed="false">Card</button>
+          </div>
+        </div>
+        <div class="narrow" style="max-width:130px">
+          <label for="time">Time</label>
+          <input id="time" type="time" required>
+        </div>
+        <div class="narrow" style="flex:none">
+          <button type="button" id="btnRefund" class="ghost" aria-pressed="false" title="Record a refund of a cash or card sale">↩ Refund instead</button>
+        </div>
+        <div class="narrow">
+          <button type="submit">Add entry</button>
+        </div>
+      </div>
+      <div class="form-note" id="formNote"></div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Ledger for <span id="ledgerDay"></span></h2>
+    <table class="ledger" id="ledgerTable">
+      <thead>
+        <tr><th>Time</th><th>Item</th><th>Type</th><th class="num">Amount</th><th class="num">COGS</th><th class="num">Running profit</th><th></th></tr>
+      </thead>
+      <tbody id="ledgerBody"></tbody>
+    </table>
+    <div class="empty" id="ledgerEmpty">No entries yet for this day.</div>
+    <div class="actions">
+      <button type="button" id="btnCsvDay">⬇ Export this day (CSV)</button>
+      <button type="button" id="btnCsvAll" class="ghost">⬇ Export every day (CSV)</button>
+      <button type="button" id="btnClear" class="danger">Clear this day</button>
+    </div>
+  </section>
+
+  <footer>
+    Built as a beginner-friendly tool by <a href="https://dylanasdale.github.io" rel="noopener">Asdale Dynamics, LLC</a>.
+    All totals and exports are vendor-entered figures for your own records — not tax advice.
+  </footer>
+</main>
+
+<script id="app">
+'use strict';
+(function () {
+  var App = {};
+
+  App.roundCents = function (n) { return Math.round(n); };
+
+  App.moneyToCents = function (raw) {
+    if (raw === null || raw === undefined) return null;
+    var s = String(raw).trim().replace(/[$€£¥,]/g, '');
+    if (s === '') return null;
+    var n = Number(s);
+    if (!isFinite(n)) return null;
+    return App.roundCents(n * 100);
+  };
+
+  App.centsToMoney = function (cents, symbol) {
+    var sym = (symbol === null || symbol === undefined) ? '' : symbol;
+    var sign = cents < 0 ? '-' : '';
+    var abs = Math.abs(cents);
+    var whole = String(Math.floor(abs / 100));
+    var frac = String(abs % 100);
+    if (frac.length === 1) frac = '0' + frac;
+    return sign + sym + whole + '.' + frac;
+  };
+
+  App.computeTotals = function (entries) {
+    var t = { grossSales: 0, cash: 0, card: 0, refunds: 0, cogs: 0, netProfit: 0, saleCount: 0, refundCount: 0 };
+    var list = entries || [];
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      var amount = Number(e.amount) || 0;
+      var cogs = Number(e.cogs) || 0;
+      if (e.kind === 'refund') {
+        t.refunds += amount;
+        if (e.method === 'cash') t.cash -= amount; else t.card -= amount;
+        t.netProfit -= amount;
+        t.refundCount += 1;
+      } else {
+        t.grossSales += amount;
+        if (e.method === 'cash') t.cash += amount; else t.card += amount;
+        t.cogs += cogs;
+        t.netProfit += amount - cogs;
+        t.saleCount += 1;
+      }
+    }
+    return t;
+  };
+
+  App.sortEntries = function (entries) {
+    return (entries || []).slice().sort(function (a, b) {
+      if (a.ts === b.ts) return (a.seq || 0) - (b.seq || 0);
+      return a.ts < b.ts ? -1 : 1;
+    });
+  };
+
+  App.hourOf = function (ts) {
+    var h = parseInt(String(ts).slice(11, 13), 10);
+    return isNaN(h) ? 0 : h;
+  };
+
+  App.hourlyPace = function (entries, startHour, endHour) {
+    var from = Math.max(0, Math.min(23, Math.floor(startHour)));
+    var to = Math.max(from + 1, Math.min(24, Math.floor(endHour))) - 1;
+    var buckets = {};
+    var sorted = App.sortEntries(entries);
+    var i, e, h;
+    for (var hh = from; hh <= to; hh++) buckets[hh] = { hour: hh, net: 0, refunds: 0, count: 0 };
+    for (i = 0; i < sorted.length; i++) {
+      e = sorted[i];
+      h = App.hourOf(e.ts);
+      if (buckets[h] === undefined) continue;
+      var b = buckets[h];
+      if (e.kind === 'refund') {
+        b.refunds += Number(e.amount) || 0;
+        b.net -= Number(e.amount) || 0;
+      } else {
+        b.net += Number(e.amount) || 0;
+      }
+      b.count += 1;
+    }
+    var out = [], hh2;
+    for (hh2 = from; hh2 <= to; hh2++) out.push(buckets[hh2]);
+    return out;
+  };
+
+  App.csvEscape = function (value) {
+    var s = (value === null || value === undefined) ? '' : String(value);
+    if (/[",\r\n]/.test(s)) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  };
+
+  App.csvRow = function (fields) {
+    var out = [];
+    for (var i = 0; i < fields.length; i++) out.push(App.csvEscape(fields[i]));
+    return out.join(',');
+  };
+
+  App.cents = function (c) { return (c / 100).toFixed(2); };
+
+  App.buildCSV = function (days, vendorName, generatedAt) {
+    var rows = [];
+    var vendor = vendorName || '';
+    var stamp = generatedAt || new Date().toISOString().replace('T', ' ').slice(0, 19);
+    rows.push(App.csvRow(['Tiny Merchant Profit - Vendor Math CSV']));
+    rows.push(App.csvRow(['Generated', stamp]));
+    rows.push(App.csvRow(['Vendor', vendor]));
+    rows.push('');
+    rows.push(App.csvRow(['Date', 'Time', 'Description', 'Method', 'Type', 'Gross Amount', 'Cost Of Goods', 'Net Contribution', 'Running Profit']));
+    var running = 0;
+    for (var d = 0; d < days.length; d++) {
+      var day = days[d];
+      var sorted = App.sortEntries(day.entries);
+      for (var i = 0; i < sorted.length; i++) {
+        var e = sorted[i];
+        var amount = Number(e.amount) || 0;
+        var cogs = Number(e.cogs) || 0;
+        var net = e.kind === 'refund' ? -amount : (amount - cogs);
+        running += net;
+        rows.push(App.csvRow([
+          day.date, String(e.ts).slice(11, 16), e.desc || '', e.method || '',
+          e.kind === 'refund' ? 'REFUND' : 'SALE',
+          App.cents(e.kind === 'refund' ? -amount : amount), App.cents(cogs), App.cents(net), App.cents(running)
+        ]));
+      }
+    }
+    rows.push('');
+    rows.push(App.csvRow(['Metric', 'Date', 'Value']));
+    var grand = { gross: 0, net: 0, days: 0 };
+    for (var d2 = 0; d2 < days.length; d2++) {
+      var t = App.computeTotals(days[d2].entries);
+      if (t.saleCount > 0 || t.refundCount > 0) grand.days += 1;
+      grand.gross += t.grossSales - t.refunds;
+      grand.net += t.netProfit;
+      rows.push(App.csvRow(['Gross Sales', days[d2].date, App.cents(t.grossSales)]));
+      rows.push(App.csvRow(['Cash Sales', days[d2].date, App.cents(t.cash)]));
+      rows.push(App.csvRow(['Card Sales', days[d2].date, App.cents(t.card)]));
+      rows.push(App.csvRow(['Refunds', days[d2].date, App.cents(t.refunds)]));
+      rows.push(App.csvRow(['Cost Of Goods', days[d2].date, App.cents(t.cogs)]));
+      rows.push(App.csvRow(['Net Profit', days[d2].date, App.cents(t.netProfit)]));
+    }
+    rows.push('');
+    rows.push(App.csvRow(['Metric', 'Value']));
+    rows.push(App.csvRow(['Revenue (gross sales minus refunds), all days', App.cents(grand.gross)]));
+    rows.push(App.csvRow(['Net Profit (after cost of goods), all days', App.cents(grand.net)]));
+    rows.push(App.csvRow(['Shift Days With Entries', grand.days]));
+    rows.push('');
+    rows.push(App.csvRow(['Note', 'All figures are vendor-entered records for your own bookkeeping. Revenue for tax reporting is typically gross sales minus refunds; confirm details with your own tax prep. This file is not tax advice.']));
+    return rows.join('\r\n') + '\r\n';
+  };
+
+  initApp(App);
+
+  function initApp(App) {
+    if (typeof document === 'undefined') { window.App = App; return; }
+    window.App = App;
+
+    var STORAGE_SETTINGS = 'tmp.settings.v1';
+    var STORAGE_LEDGER = 'tmp.ledger.v1';
+
+    function safeGet(key) {
+      try { return window.localStorage.getItem(key); } catch (err) { return null; }
+    }
+    function safeSet(key, value) {
+      try { window.localStorage.setItem(key, value); return true; } catch (err) { return false; }
+    }
+
+    function todayStr() {
+      var d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    var settings = { vendor: '', symbol: '$', startHour: 9, endHour: 17 };
+    var ledger = {};
+    var day;
+    var method = 'cash';
+    var kind = 'sale';
+    var seqCounter = 0;
+
+    function load() {
+      try {
+        var s = JSON.parse(safeGet(STORAGE_SETTINGS) || 'null');
+        if (s && typeof s === 'object') {
+          if (typeof s.vendor === 'string') settings.vendor = s.vendor;
+          if (typeof s.symbol === 'string' && s.symbol) settings.symbol = s.symbol.slice(0, 3);
+          if (Number.isInteger(s.startHour) && s.startHour >= 0 && s.startHour < 24) settings.startHour = s.startHour;
+          if (Number.isInteger(s.endHour) && s.endHour > 0 && s.endHour <= 24) settings.endHour = s.endHour;
+          if (settings.endHour <= settings.startHour) settings.endHour = Math.min(24, settings.startHour + 8);
+        }
+        var l = JSON.parse(safeGet(STORAGE_LEDGER) || 'null');
+        if (l && typeof l === 'object' && !Array.isArray(l)) ledger = l;
+      } catch (err) { /* corrupt storage: start clean */ }
+    }
+
+    function save() {
+      safeSet(STORAGE_SETTINGS, JSON.stringify(settings));
+      safeSet(STORAGE_LEDGER, JSON.stringify(ledger));
+    }
+
+    var el = function (id) { return document.getElementById(id); };
+    var dayInput = el('day'), vendorInput = el('vendor'), symbolInput = el('symbol');
+    var startSel = el('startHour'), endSel = el('endHour');
+    var descInput = el('desc'), amountInput = el('amount'), cogsInput = el('cogs'), timeInput = el('time');
+    var formEl = el('entryForm'), noteEl = el('formNote');
+    var btnCash = el('btnCash'), btnCard = el('btnCard'), btnRefund = el('btnRefund');
+
+    function entriesFor(d) {
+      if (!ledger[d] || !Array.isArray(ledger[d])) ledger[d] = [];
+      return ledger[d];
+    }
+
+    function hourLabel(h) {
+      var ampm = h < 12 ? 'a' : 'p';
+      var hh = h % 12 === 0 ? 12 : h % 12;
+      return hh + ampm;
+    }
+
+    function populateHours() {
+      startSel.innerHTML = '';
+      endSel.innerHTML = '';
+      for (var h = 0; h <= 24; h++) {
+        if (h <= 23) {
+          var o1 = document.createElement('option');
+          o1.value = String(h); o1.textContent = hourLabel(h);
+          startSel.appendChild(o1);
+        }
+        var o2 = document.createElement('option');
+        o2.value = String(h); o2.textContent = (h === 24 ? 'midnight' : hourLabel(h));
+        endSel.appendChild(o2);
+      }
+      startSel.value = String(settings.startHour);
+      endSel.value = String(settings.endHour);
+    }
+
+    function nowTimeStr() {
+      var d = new Date();
+      return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+
+    function fmt(c) { return App.centsToMoney(c, settings.symbol); }
+
+    function renderTotals() {
+      var entries = entriesFor(day);
+      var t = App.computeTotals(entries);
+      el('gross').textContent = fmt(t.grossSales);
+      el('cash').textContent = fmt(t.cash);
+      el('card').textContent = fmt(t.card);
+      el('cogs').textContent = fmt(t.cogs);
+      el('netProfitSmall').textContent = fmt(t.netProfit);
+      el('netProfit').textContent = fmt(t.netProfit);
+      var netStat = el('netStat');
+      netStat.classList.toggle('neg', t.netProfit < 0);
+      el('netProfit').style.color = t.netProfit < 0 ? 'var(--red)' : 'var(--green)';
+      var refundsEl = el('refunds');
+      refundsEl.textContent = fmt(t.refunds);
+      refundsEl.style.color = t.refunds > 0 ? 'var(--red)' : '';
+      var parts = [];
+      parts.push(t.saleCount + (t.saleCount === 1 ? ' sale' : ' sales'));
+      if (t.refundCount) parts.push(t.refundCount + (t.refundCount === 1 ? ' refund' : ' refunds'));
+      parts.push('Net = gross sales − COGS − refunds.');
+      el('netDetail').textContent = parts.join(' · ');
+      el('ledgerDay').textContent = day;
+      var empty = el('ledgerEmpty');
+      if (entries.length === 0) empty.style.display = ''; else empty.style.display = 'none';
+    }
+
+    function renderLedger() {
+      var body = el('ledgerBody');
+      body.innerHTML = '';
+      var entries = App.sortEntries(entriesFor(day));
+      var running = 0;
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        var amount = Number(e.amount) || 0;
+        var cogs = Number(e.cogs) || 0;
+        var net = e.kind === 'refund' ? -amount : (amount - cogs);
+        running += net;
+        var tr = document.createElement('tr');
+        var timeTd = document.createElement('td');
+        timeTd.textContent = String(e.ts).slice(11, 16);
+        var descTd = document.createElement('td');
+        descTd.textContent = e.desc || '';
+        var typeTd = document.createElement('td');
+        var badge = document.createElement('span');
+        if (e.kind === 'refund') {
+          badge.className = 'badge refund';
+          badge.textContent = (e.method === 'cash' ? '↩ cash' : '↩ card');
+        } else {
+          badge.className = 'badge ' + e.method;
+          badge.textContent = e.method;
+        }
+        typeTd.appendChild(badge);
+        var amountTd = document.createElement('td');
+        amountTd.className = 'num';
+        amountTd.textContent = fmt(e.kind === 'refund' ? -amount : amount);
+        var cogsTd = document.createElement('td');
+        cogsTd.className = 'num';
+        cogsTd.textContent = cogs ? fmt(cogs) : '';
+        var runTd = document.createElement('td');
+        runTd.className = 'num';
+        runTd.style.fontWeight = '700';
+        runTd.textContent = fmt(running);
+        if (running < 0) runTd.style.color = 'var(--red)';
+        var delTd = document.createElement('td');
+        var delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'del';
+        delBtn.setAttribute('aria-label', 'Delete entry ' + timeTd.textContent);
+        delBtn.textContent = '✕';
+        (function (id) {
+          delBtn.addEventListener('click', function () { deleteEntry(id); });
+        })(e.id);
+        delTd.appendChild(delBtn);
+        tr.appendChild(timeTd); tr.appendChild(descTd); tr.appendChild(typeTd);
+        tr.appendChild(amountTd); tr.appendChild(cogsTd); tr.appendChild(runTd); tr.appendChild(delTd);
+        body.appendChild(tr);
+      }
+    }
+
+    function renderPace() {
+      var paceEl = el('pace');
+      paceEl.innerHTML = '';
+      var buckets = App.hourlyPace(entriesFor(day), settings.startHour, settings.endHour);
+      var max = 0;
+      for (var i = 0; i < buckets.length; i++) max = Math.max(max, buckets[i].net);
+      for (var j = 0; j < buckets.length; j++) {
+        var b = buckets[j];
+        var slot = document.createElement('div');
+        slot.className = 'slot';
+        var bar = document.createElement('div');
+        if (max === 0 || b.net <= 0) {
+          bar.className = 'bar zero';
+        } else {
+          bar.className = 'bar';
+          bar.style.height = Math.max(6, Math.round(b.net / max * 100)) + '%';
+        }
+        slot.title = hourLabel(b.hour) + ' — net ' + fmt(b.net) +
+          (b.refunds ? ' (refunds ' + fmt(b.refunds) + ')' : '') +
+          (b.count ? ' · ' + b.count + ' entries' : ' · no entries');
+        bar.setAttribute('aria-hidden', 'true');
+        var lbl = document.createElement('div');
+        lbl.className = 'lbl';
+        lbl.textContent = hourLabel(b.hour);
+        slot.appendChild(bar); slot.appendChild(lbl);
+        paceEl.appendChild(slot);
+      }
+    }
+
+    function renderAll() {
+      vendorInput.value = settings.vendor;
+      symbolInput.value = settings.symbol;
+      renderTotals();
+      renderLedger();
+      renderPace();
+    }
+
+    function deleteEntry(id) {
+      var list = entriesFor(day);
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].id === id) {
+          list.splice(i, 1); break;
+        }
+      }
+      save();
+      renderAll();
+    }
+
+    function setMethod(m) {
+      method = m;
+      btnCash.setAttribute('aria-pressed', m === 'cash' ? 'true' : 'false');
+      btnCard.setAttribute('aria-pressed', m === 'card' ? 'true' : 'false');
+    }
+    function setKind(k) {
+      kind = k;
+      var refund = k === 'refund';
+      btnRefund.setAttribute('aria-pressed', refund ? 'true' : 'false');
+      btnRefund.classList.toggle('refund-on', refund);
+      btnCash.classList.toggle('refund-on', refund);
+      btnCard.classList.toggle('refund-on', refund);
+      cogsInput.disabled = refund;
+      cogsInput.value = refund ? '' : cogsInput.value;
+      el('formTitle').textContent = refund ? 'Record a refund' : 'Add a sale';
+    }
+
+    btnRefund.addEventListener('click', function () { setKind(kind === 'refund' ? 'sale' : 'refund'); });
+    btnCash.addEventListener('click', function () { setMethod('cash'); });
+    btnCard.addEventListener('click', function () { setMethod('card'); });
+
+    formEl.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      noteEl.textContent = '';
+      var cents = App.moneyToCents(amountInput.value);
+      if (cents === null || cents <= 0) {
+        noteEl.textContent = 'Enter an amount greater than zero.';
+        amountInput.focus();
+        return;
+      }
+      if (cents > 100000000) {
+        noteEl.textContent = 'That amount looks too large — check the digits.';
+        return;
+      }
+      var cogsCents = 0;
+      if (kind === 'sale' && cogsInput.value.trim() !== '') {
+        cogsCents = App.moneyToCents(cogsInput.value) || 0;
+        if (cogsCents < 0) { noteEl.textContent = 'Cost of goods cannot be negative.'; return; }
+      }
+      var t = timeInput.value;
+      if (!t) { noteEl.textContent = 'Pick a time for the entry.'; return; }
+      seqCounter += 1;
+      entriesFor(day).push({
+        id: 'e' + Date.now().toString(36) + '_' + seqCounter,
+        ts: day + 'T' + t,
+        desc: descInput.value.trim(),
+        method: method,
+        kind: kind,
+        amount: cents,
+        cogs: cogsCents
+      });
+      save();
+      descInput.value = '';
+      amountInput.value = '';
+      if (kind !== 'refund') cogsInput.value = '';
+      descInput.focus();
+      renderAll();
+    });
+
+    dayInput.addEventListener('change', function () {
+      day = dayInput.value || todayStr();
+      save();
+      timeInput.value = nowTimeStr();
+      renderAll();
+    });
+    vendorInput.addEventListener('input', function () { settings.vendor = vendorInput.value; save(); });
+    symbolInput.addEventListener('input', function () {
+      settings.symbol = symbolInput.value || '$';
+      save(); renderTotals(); renderPace();
+    });
+    startSel.addEventListener('change', function () {
+      settings.startHour = Math.min(parseInt(startSel.value, 10), 23);
+      if (settings.endHour <= settings.startHour) settings.endHour = Math.min(24, settings.startHour + 1);
+      endSel.value = String(settings.endHour);
+      save(); renderPace();
+    });
+    endSel.addEventListener('change', function () {
+      settings.endHour = parseInt(endSel.value, 10);
+      if (settings.endHour <= settings.startHour) settings.startHour = Math.max(0, settings.endHour - 1);
+      startSel.value = String(settings.startHour);
+      save(); renderPace();
+    });
+
+    function downloadText(filename, text) {
+      var blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    }
+
+    el('btnCsvDay').addEventListener('click', function () {
+      var entries = entriesFor(day);
+      if (entries.length === 0) { noteEl.textContent = 'Nothing to export yet for ' + day + '.'; return; }
+      downloadText('vendor-math-' + day + '.csv', App.buildCSV([{ date: day, entries: entries }], settings.vendor));
+    });
+    el('btnCsvAll').addEventListener('click', function () {
+      var dates = Object.keys(ledger).filter(function (d) { return Array.isArray(ledger[d]) && ledger[d].length > 0; }).sort();
+      if (dates.length === 0) { noteEl.textContent = 'No entries on any day yet.'; return; }
+      var days = dates.map(function (d) { return { date: d, entries: ledger[d] }; });
+      downloadText('vendor-math-all-days.csv', App.buildCSV(days, settings.vendor));
+    });
+    el('btnClear').addEventListener('click', function () {
+      if (entriesFor(day).length === 0) return;
+      if (window.confirm('Delete every entry for ' + day + '? This cannot be undone.')) {
+        ledger[day] = [];
+        save();
+        renderAll();
+      }
+    });
+
+    load();
+    day = todayStr();
+    dayInput.value = day;
+    populateHours();
+    timeInput.value = nowTimeStr();
+    renderAll();
+  }
+
+  window.App = App;
+})();
+</script>
+</body>
+</html>
